@@ -1,103 +1,184 @@
 import random
+import string
 
-def load_word():
-    '''
-    A function that reads a text file of words and randomly selects one to use as the secret word
-        from the list.
-    '''
-    f = open('words.txt', 'r')
-    words_list = f.readlines()
-    f.close()
-    
-    words_list = words_list[0].split(' ') 
-    secret_word = random.choice(words_list)
-    return secret_word.strip().lower()
+# =============================
+# ASCII ART FOR THE SPACEMAN
+# =============================
+SPACEMAN_PICS = [
+    """
+       +---+
+           |
+           |
+           |
+          ===""",
+    """
+       +---+
+       O   |
+           |
+           |
+          ===""",
+    """
+       +---+
+       O   |
+       |   |
+           |
+          ===""",
+    """
+       +---+
+       O   |
+      /|   |
+           |
+          ===""",
+    """
+       +---+
+       O   |
+      /|\\  |
+           |
+          ===""",
+    """
+       +---+
+       O   |
+      /|\\  |
+      /    |
+          ===""",
+    """
+       +---+
+       O   |
+      /|\\  |
+      / \\  |
+          ==="""
+]
+
+# Load words from file
+def load_words(filename="words.txt"):
+    try:
+        with open(filename, "r") as f:
+            words_list = f.read().split()
+            return words_list
+    except FileNotFoundError:
+        # fallback list
+        return ["cat", "bar", "bat", "car", "star", "space", "python", "rocket"]
+
+# =============================
+# SINISTER WORD CHANGER
+# =============================
+
+def pick_new_sinister_word(words, current_word, guessed_correct):
+    """Pick a new word with:
+       - same length
+       - fits all correctly guessed letters in the same positions
+    """
+    pattern = get_pattern(current_word, guessed_correct)
+
+    valid_candidates = []
+    for w in words:
+        if len(w) != len(current_word):
+            continue
+        if word_matches_pattern(w, pattern, guessed_correct):
+            valid_candidates.append(w)
+
+    if valid_candidates:
+        return random.choice(valid_candidates)
+    return current_word  # fallback (should rarely happen)
 
 
+def get_pattern(word, guessed_correct):
+    """Return pattern like a_b_ for a word & guessed letters."""
+    return "".join([letter if letter in guessed_correct else "_" for letter in word])
 
-def is_word_guessed(secret_word, letters_guessed):
-    '''
-    Returns True only if all the letters of secret_word are in letters_guessed.
-    '''
-    for letter in secret_word:
-        if letter not in letters_guessed:
+
+def word_matches_pattern(candidate, pattern, guessed_correct):
+    """Check if candidate fits the pattern and does not break previously matched letters."""
+    for c1, c2 in zip(candidate, pattern):
+        if c2 != "_" and c1 != c2:
+            return False
+        # cannot contradict a known correct letter
+        if c1 in guessed_correct and c2 == "_":
             return False
     return True
 
+# =============================
+# MAIN GAME LOGIC
+# =============================
+
+def display_game_state(pattern, guessed_wrong, max_guesses):
+    print("\nCurrent Word: ", " ".join(pattern))
+    print(f"Wrong guesses ({len(guessed_wrong)}/{max_guesses}): {', '.join(guessed_wrong)}")
+    print(SPACEMAN_PICS[len(guessed_wrong)])
+    print("-" * 30)
 
 
-def get_guessed_word(secret_word, letters_guessed):
-    '''
-    Returns the current guessed word with letters and underscores.
-    Example: secret = "apple", guessed = ['p']
-             returns "_ pp_ _"
-    '''
-    result = ""
-    for letter in secret_word:
-        if letter in letters_guessed:
-            result += letter
-        else:
-            result += "_"
-    return result
-
-
-
-def is_guess_in_word(guess, secret_word):
-    '''
-    Returns True if guess is in the secret word, otherwise False.
-    '''
-    return guess in secret_word
-
-
-
-def spaceman(secret_word):
-    '''
-    Runs the main game loop for Spaceman.
-    '''
-
-    print("🛸 Welcome to Spaceman!")
-    print(f"The secret word has {len(secret_word)} letters.")
-    print("You have 7 incorrect guesses. Good luck!\n")
-
-    letters_guessed = []
-    incorrect_guesses = 0
-    max_incorrect = 7
-
-    # Game loop
-    while incorrect_guesses < max_incorrect:
-
-        print("Current word:", get_guessed_word(secret_word, letters_guessed))
-        print(f"Incorrect guesses left: {max_incorrect - incorrect_guesses}")
-
-        # Ask for guess
-        guess = input("Guess a letter: ").lower().strip()
-
-        # Enforce single-letter input
-        if len(guess) != 1 or not guess.isalpha():
-            print("❗ Please guess exactly ONE letter.\n")
+def get_valid_letter(guessed_all):
+    while True:
+        guess = input("Guess a letter → ").lower().strip()
+        if len(guess) != 1 or guess not in string.ascii_lowercase:
+            print("❗ Please enter **one single letter**.")
             continue
-
-        # Alert if repeated guess
-        if guess in letters_guessed:
-            print("⚠ You already guessed that letter!\n")
+        if guess in guessed_all:
+            print("⚠ You already guessed that letter! Try another.")
             continue
+        return guess
 
-        letters_guessed.append(guess)
 
-        # Check guess correctness
-        if is_guess_in_word(guess, secret_word):
-            print("✅ Correct guess!\n")
+def play_spaceman():
+    print("\n🛸 Welcome to SINISTER SPACEMAN! 🛸")
+
+    words = load_words()
+    chosen_word = random.choice(words)
+    word_length = len(chosen_word)
+    max_wrong_guesses = word_length
+
+    guessed_correct = set()
+    guessed_wrong = set()
+    guessed_all = set()
+
+    print(f"\nThe mystery word has {word_length} letters.")
+
+    while True:
+        pattern = get_pattern(chosen_word, guessed_correct)
+        display_game_state(pattern, guessed_wrong, max_wrong_guesses)
+
+        # Win condition
+        if "_" not in pattern:
+            print("🎉 YOU WIN! The word was:", chosen_word)
+            break
+
+        # Loss condition
+        if len(guessed_wrong) >= max_wrong_guesses:
+            print("💀 You lost!")
+            print("The mystery word was:", chosen_word)
+            break
+
+        guess = get_valid_letter(guessed_all)
+        guessed_all.add(guess)
+
+        # Correct guess
+        if guess in chosen_word:
+            print(f"✅ Correct! '{guess}' is in the word.")
+            guessed_correct.add(guess)
+
+            # --- SINISTER MODE ---
+            # After showing them the correct letter, we change the word!
+            new_word = pick_new_sinister_word(words, chosen_word, guessed_correct)
+            chosen_word = new_word
+
         else:
-            print("❌ Incorrect guess.\n")
-            incorrect_guesses += 1
-
-        # Check win state
-        if is_word_guessed(secret_word, letters_guessed):
-            print("🎉 YOU WIN! The word was:", secret_word)
-            return
-
-    # Loss condition
-    print("💀 You've run out of guesses! You lost.")
-    print("The secret word was:", secret_word)
+            print(f"❌ Incorrect. '{guess}' is NOT in the word.")
+            guessed_wrong.add(guess)
 
 
+# =============================
+# PLAY AGAIN LOOP
+# =============================
+
+def main():
+    while True:
+        play_spaceman()
+        again = input("\nPlay again? (y/n) → ").lower().strip()
+        if again != "y":
+            print("\n🚀 Thanks for playing Spaceman!")
+            break
+
+
+if __name__ == "__main__":
+    main()
