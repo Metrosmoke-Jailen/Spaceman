@@ -128,7 +128,7 @@ def start():
 def game():
     # Prevent playing without starting
     if "word" not in session:
-        return redirect(url_for("start"))
+        start_new_game()
 
     word = session["word"]
     guessed_correct = set(session["guessed_correct"])
@@ -199,6 +199,9 @@ def restart():
     start_new_game()
     return redirect(url_for("game"))
 
+@app.route("/debug")
+def debug():
+    return str(session)
 
 if __name__ == "__main__":
     app.run(debug=True)
