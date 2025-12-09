@@ -133,4 +133,82 @@ def game():
         start_new_game()
 
     word = session["word"]
-    correct = session["correct"]()
+    correct = session["correct"]
+    wrong = session["wrong"]
+    guessed = session["guessed"]
+    max_wrong = session["max_wrong"]
+    sinister_mode = session.get("sinister", False)
+
+    message = ""
+    error = ""
+
+    # Handle Guess
+    if request.method == "POST":
+        guess = request.form.get("guess", "").lower().strip()
+
+        # Validate guess
+        if len(guess) != 1 or guess not in string.ascii_lowercase:
+            error = "Please enter a single letter."
+        elif guess in guessed:
+            error = f"You already guessed '{guess}'."
+        else:
+            guessed.append(guess)
+
+            if guess in word:
+                correct.append(guess)
+                message = f"Correct! '{guess}' is in the word."
+
+                # Sinister: change word after correct guess
+                if sinister_mode:
+                    words = load_words()
+                    new_word = sinister_new_word(words, word, correct)
+                    word = new_word
+                    session["word"] = new_word
+
+            else:
+                wrong.append(guess)
+                message = f"Incorrect. '{guess}' is not in the word."
+
+    # Build pattern for display
+    pattern = get_pattern(word, correct)
+
+    # Win
+    if "_" not in pattern:
+        return render_template(
+            "win.html",
+            word=word
+        )
+
+    # Lose
+    if len(wrong) >= max_wrong:
+        return render_template(
+            "lose.html",
+            word=word,
+            ascii=SPACEMAN_PICS[-1]
+        )
+
+    # Game Page
+    return render_template(
+        "game.html",
+        pattern=pattern,
+        wrong=wrong,
+        correct=correct,
+        guessed=guessed,
+        guesses_left=max_wrong - len(wrong),
+        ascii=SPACEMAN_PICS[len(wrong)],
+        message=message,
+        error=error
+    )
+
+
+@app.route("/reset")
+def reset():
+    start_new_game()
+    return redirect(url_for("game"))
+
+
+# -------------------------------------------------------
+# Run App
+# -------------------------------------------------------
+if __name__ == "__main__":
+    app.run(debug=True)
