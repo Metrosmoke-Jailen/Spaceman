@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ title or "Spaceman" }}</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #111;
+            color: #fff;
+            margin: 0;
+            padding: 0;
+        }
+
+        /* --- SINISTER MODE THEME --- */
+        body.sinister {
+            background: #200;
+            color: #ff4444;
+        }
+        body.sinister a {
+            color: #ff8888;
+        }
+        body.sinister .container {
+            border-color: #440000 !important;
+            box-shadow: 0 0 30px #600 inset !important;
+        }
+
+        /* Toggle Button */
+        #sinisterToggle {
+            position: fixed;
+            top: 15px;
+            right: 15px;
+            background: #333;
+            color: white;
+            border: 2px solid #555;
+            padding: 8px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            z-index: 1000;
+        }
+        body.sinister #sinisterToggle {
+            background: #700;
+            border-color: #a00;
+        }
+    </style>
+</head>
+
+<body>
+    <button id="sinisterToggle">Sinister Mode</button>
+
+    <script>
+        // Load saved mode
+        if (localStorage.getItem("sinister") === "true") {
+            document.body.classList.add("sinister");
+        }
+
+        document.getElementById("sinisterToggle").addEventListener("click", () => {
+            document.body.classList.toggle("sinister");
+
+            // Save preference
+            const enabled = document.body.classList.contains("sinister");
+            localStorage.setItem("sinister", enabled);
+        });
+    </script>
+
+    <div class="container" style="
+        max-width: 800px;
+        margin: 40px auto;
+        padding: 25px;
+        background: rgba(0,0,0,0.4);
+        border: 2px solid #222;
+        border-radius: 12px;
+        backdrop-filter: blur(4px);
+    ">
+        {% block content %}{% endblock %}
+    </div>
+
+</body>
+</html>
