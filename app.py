@@ -1,16 +1,14 @@
-from flask import Flask, render_template, request, session, redirect, url_for
+from flask import Flask, render_template, request, redirect, session, url_for
 import random
 import string
-from pathlib import Path
-import os
 
 app = Flask(__name__)
-app.secret_key = os.urandom(32)
+app.secret_key = "SUPER_SECRET_KEY_CHANGE_THIS"  # Required for session cookies
 
 
-# =============================
-# ASCII ART FOR SPACEMAN
-# =============================
+# -------------------------------------------------------
+# ASCII Art (optional, you can display or not)
+# -------------------------------------------------------
 SPACEMAN_PICS = [
     """
        +---+
@@ -57,61 +55,64 @@ SPACEMAN_PICS = [
 ]
 
 
-# =============================
-# LOAD WORDS
-# =============================
-def load_words():
-    if Path("words.txt").exists():
-        with open("words.txt", "r") as f:
+# -------------------------------------------------------
+# Load word list
+# -------------------------------------------------------
+def load_words(filename="words.txt"):
+    try:
+        with open(filename, "r") as f:
             return f.read().split()
-    return ["car", "cat", "bar", "bat", "star", "space", "python", "rocket"]
+    except FileNotFoundError:
+        return ["cat", "bar", "bat", "car", "star", "space",
+                "python", "rocket", "planet", "galaxy"]
 
 
-# =============================
-# SINISTER MODE HELPERS
-# =============================
-def get_pattern(word, guessed_correct):
-    return "".join([letter if letter in guessed_correct else "_" for letter in word])
+# -------------------------------------------------------
+# Game Helper Functions
+# -------------------------------------------------------
+def get_pattern(word, correct_letters):
+    """Pattern like _ a _ _ e"""
+    return "".join([c if c in correct_letters else "_" for c in word])
 
 
-def word_matches_pattern(candidate, pattern, guessed_correct):
+def word_matches_pattern(candidate, pattern, correct_letters):
+    """Ensure candidate fits pattern & doesn't break known letters"""
     for c1, c2 in zip(candidate, pattern):
         if c2 != "_" and c1 != c2:
             return False
-        if c1 in guessed_correct and c2 == "_":
+        if c1 in correct_letters and c2 == "_":
             return False
     return True
 
 
-def pick_new_sinister_word(words, current_word, guessed_correct):
-    pattern = get_pattern(current_word, guessed_correct)
+def sinister_new_word(words, current_word, correct_letters):
+    """Sinister mode: word changes but keeps same length & revealed letters"""
+    pattern = get_pattern(current_word, correct_letters)
     candidates = [
         w for w in words
-        if len(w) == len(current_word) and word_matches_pattern(w, pattern, guessed_correct)
+        if len(w) == len(current_word)
+        and word_matches_pattern(w, pattern, correct_letters)
     ]
     return random.choice(candidates) if candidates else current_word
 
 
-# =============================
-# NEW GAME INITIALIZATION
-# =============================
+# -------------------------------------------------------
+# Start a new game (never redirects - prevents loops)
+# -------------------------------------------------------
 def start_new_game():
     words = load_words()
     word = random.choice(words)
-
     session["word"] = word
-    session["words"] = words
-    session["guessed_correct"] = []
-    session["guessed_wrong"] = []
-    session["guessed_all"] = []
+    session["correct"] = []
+    session["wrong"] = []
+    session["guessed"] = []
     session["max_wrong"] = len(word)
-    session["game_over"] = False
-    session["won"] = False
+    session["sinister"] = True  # Toggle sinister mode ON/OFF
 
 
-# =============================
-# ROUTES
-# =============================
+# -------------------------------------------------------
+# Routes
+# -------------------------------------------------------
 
 @app.route("/")
 def index():
@@ -126,82 +127,10 @@ def start():
 
 @app.route("/game", methods=["GET", "POST"])
 def game():
-    # Prevent playing without starting
+
+    # SAFETY: Instead of redirecting → just start a new game
     if "word" not in session:
         start_new_game()
 
     word = session["word"]
-    guessed_correct = set(session["guessed_correct"])
-    guessed_wrong = set(session["guessed_wrong"])
-    guessed_all = set(session["guessed_all"])
-    max_wrong = session["max_wrong"]
-    words = session["words"]
-
-    message = None
-
-    if request.method == "POST" and not session.get("game_over"):
-        guess = request.form.get("guess", "").lower().strip()
-
-        # Validation
-        if len(guess) != 1 or guess not in string.ascii_lowercase:
-            message = "❗ Please enter a single valid letter."
-        elif guess in guessed_all:
-            message = "⚠ You already guessed that!"
-        else:
-            guessed_all.add(guess)
-            session["guessed_all"] = list(guessed_all)
-
-            if guess in word:
-                guessed_correct.add(guess)
-                session["guessed_correct"] = list(guessed_correct)
-
-                # SINISTER MODE
-                new_word = pick_new_sinister_word(words, word, guessed_correct)
-                session["word"] = new_word
-                word = new_word
-                message = f"✅ Correct! '{guess}' is in the word."
-            else:
-                guessed_wrong.add(guess)
-                session["guessed_wrong"] = list(guessed_wrong)
-                message = f"❌ '{guess}' is NOT in the word."
-
-    pattern = get_pattern(word, guessed_correct)
-
-    # Win condition
-    if "_" not in pattern:
-        session["game_over"] = True
-        session["won"] = True
-
-    # Loss condition
-    if len(guessed_wrong) >= max_wrong:
-        session["game_over"] = True
-        session["won"] = False
-
-    # Choose ASCII art
-    ascii_art = SPACEMAN_PICS[min(len(guessed_wrong), len(SPACEMAN_PICS) - 1)]
-
-    return render_template(
-        "game.html",
-        pattern=pattern,
-        wrong_guesses=guessed_wrong,
-        guessed_all=guessed_all,
-        max_wrong=max_wrong,
-        ascii_art=ascii_art,
-        message=message,
-        game_over=session["game_over"],
-        won=session["won"],
-        word=word  # reveal on loss
-    )
-
-
-@app.route("/restart")
-def restart():
-    start_new_game()
-    return redirect(url_for("game"))
-
-@app.route("/debug")
-def debug():
-    return str(session)
-
-if __name__ == "__main__":
-    app.run(debug=True)
+    correct = session["correct"]()
